@@ -121,4 +121,7 @@
 	'function () { \r\n\t\ttype = vm.type;\r\n\t}'		
 	[x] baby.html  [x] node.js  [ ] bbt.html 	
 	==> 其實沒錯，因為 jeforth.js 裡面看到的 vm 就是自己。不是外面那個 vm instance.	
-		
+
+[ ] 準備回應爽哥要求 jeforth.html 改寫中, jsc 還有問題。	
+
+

@@ -23,11 +23,9 @@ function jeForth() {
 	var newxt = function(){}; // new word's function()
 	var newhelp = "";
 	var type = function(){}; // dummy 
-
 	vm.init = function (f) { 
 		type = f;
 	}
-	
 	function Word(a) {
 		this.name = a.shift();  // name and xt are mandatory
 		this.xt = a.shift();

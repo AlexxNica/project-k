@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title class=appname>project-k jeforth</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="common.css">
+    <style id=styleTextareaFocus type="text/css">
+            textarea:focus {
+                background:#E0E0E0;
+            }
+    </style>
+    <script src="jquery-1.11.2.js"></script>
+    <Script src="jeforth.js"></Script>
+    <script id=js>
+    window.vm = new jeForth();
+    // vm is now the jeforth virtual machine object. It has no idea about the outside world
+    // that can be variant applications: HTML, HTA, Node.js, Node-webkit, .. etc.
+    // We need to help it a little as the following example:
+    
+    (function(){
+        // I/O  
+        // Forth vm doesn't know how to 'type'. We need teach it by defining the vm.type().
+        // vm.type() is the only mandatory I/O jeforth VM needs to know. 
+        var type = vm.type = function (s) {
+            try {
+                var ss = s + ''; // Print-able test
+            } catch(err) {
+                ss = Object.prototype.toString.apply(s);
+            }
+            $('#outputbox').append(plain(ss));
+        };
+        
+        // The Forth traditional prompt 'OK' is defined and used in this application main program.
+        // Forth vm has no idea about vm.prompt but your program may want to know.
+        // In that case, as an example, use vm property to store the vm global variables and functions.
+        vm.prompt = "OK";
+
+        // The Forth vm has no idea how to clear the display. We know that we will want to 
+        // clear the display so we define vm.clearScreen() here in the application main program.
+        // This is the good place to define application dependent functions. Use the same function 
+        // name for all different applications so your forth.f source code doesn't need to change.
+        function clearScreen(){
+            outputbox.innerHTML="";
+        }
+        vm.clearScreen = clearScreen;
+
+        // System initialization
+        jQuery(document).ready(
+            function() {
+                document.onkeydown = hotKeyHandler; // Must be using onkeydown so as to grab the control.
+                vm.init(type); // Introduce I/O to Forth VM
+                // vm.dictate() is the only Forth command interface.
+                // Send a command line string, or an entire source code file into the Forth VM through
+                // this interface.
+                vm.dictate(source_code.value); 
+                
+            }
+        );
+
+        function forthConsoleHandler(cmd) {
+            type((cmd?'\n> ':"")+cmd+'\n');
+            vm.dictate(cmd);  // Pass the command line to jeForth VM
+            type(" " + vm.prompt + " ");
+            jump2endofinputbox.click(); inputbox.focus();
+        }
+
+        // onkeydown,onkeypress,onkeyup
+        // event.shiftKey event.ctrlKey event.altKey event.metaKey
+        // KeyCode test page http://www.asquare.net/javascript/tests/KeyCode.html
+        function hotKeyHandler(e) {
+            switch(e.keyCode) {
+                case 13: /* Enter */
+                    if(event.ctrlKey) {
+                        vm.inputbox = inputbox.value; // w/o the '\n' character ($10).
+                        inputbox.value = ""; // To avoid repeating the last command line when long press 'enter'.
+                        forthConsoleHandler(vm.inputbox);
+                        return(false);
+                    }
+            }
+            return (true); // pass down to following handlers
+        }
+
+		// Take care of HTML special characters
+        var plain = vm.plain = function (s) {
+            var ss = s + ""; // avoid numbers to fail at s.replace()
+            ss = ss.replace(/\t/g,' &nbsp; &nbsp;');
+            ss = ss.replace(/ /g,'&nbsp;');
+            ss = ss.replace(/</g,'&lt;');
+            ss = ss.replace(/>/g,'&gt;');
+            ss = ss.replace(/\n/g,'<br>');
+            return ss;
+        }
+    })();
+    </script>
+</head>
+<body>
+    <div><b>jeForth kernel evaluation -- baby.html FigTaiwan H.C.Chen 2015</b></div><hr>
+    <div id="outputbox"><i>Output area, 'cls' command to clear</i>
+	<div id="source_box">Forth source code. Just a few demo, scroll to view all of them. This area is deposable because definitions are read already.<textarea id="source_code" cols=100 rows=10>
+code //     var s = nexttoken('\n|\r'); last().help = s; end-code 
+            // ( <comment> -- ) Give help message to the last word.
+			
+code cls    vm.clearScreen() end-code // ( -- ) Clear output area
+code words  for(var i=1; i<words.root.length; i++) type(words.root[i].name+" ") end-code 
+            // ( -- ) List all words
+code help   for(var i=1; i<words.root.length; i++) 
+            type(words.root[i].name+" "+words.root[i].help+'\n') 
+            end-code // ( -- ) List all words' help message
+code init	// An array's length is array.length but there's no such thing of hash.length for hash{}.
+			// memberCount(object) gets the given object's member count which is also a hash table's length.
+			window.g = {}; // How to create the g object?
+			g.memberCount = function (obj) {
+				var i=0;
+				for(var members in obj) i++;
+				return i;
+			}
+			// This is a useful common tool. Compare two arrays.
+			g.isSameArray = function (a,b) {
+				if (a.length != b.length) {
+					return false;
+				} else {
+					for (var i=0; i < a.length; i++){
+						var ta = typeof(a[i]);
+						var tb = typeof(b[i]);
+						if (ta == tb) {
+							if (ta == "number"){
+								if (isNaN(a[i]) && isNaN(b[i])) continue; // because (NaN == NaN) 的結果是 false 所以要特別處理。
+							}
+							if (ta == "object") {  // 怎麼比較 obj? v2.05 之後用 memberCount()
+								if (g.memberCount(a[i]) != g.memberCount(b[i])) return false;
+							} else if (a[i] != b[i]) return false;
+						} else if (a[i] != b[i]) return false;
+					}
+					return true;
+				}
+			}
+			// Tool, check if the item exists in the array or is it a member in the hash.
+			// return {flag, key}
+			g.isMember = function (item, thing){
+				var result = {flag:false, key:0};
+				if (mytypeof(thing) == "array") {
+					for (var i in thing) {
+						if (item == thing[i]) {
+							result.flag = true;
+							result.key = parseInt(i); // array 被 JavaScript 當作 object 而 i 是個 string, 所以要轉換!
+							break;
+						}
+					}
+				} else { // if obj is not an array then assume it's an object
+					for (var i in thing) {
+						if (item == i) {
+							result.flag = true;
+							result.key = thing[i];
+							break;
+						}
+					}
+				}
+				return result; // {flag:boolean, value:(index of the array or value of the obj member)}
+			}
+			// How to clear all setInterval() and setTimeOut() without knowing their ID?
+			// http://stackoverflow.com/questions/8769598/how-to-clear-all-setinterval-and-settimeout-without-knowing-their-id
+			// 缺點是 g.setTimeout.registered() 會大量堆積，需 delete(g.setTimeout.registered()[id.toString()]) 既然還得記住
+			// timeoutId 使得 g.setTimeout() 的好處大打折扣。 查看： js> g.setTimeout.registered() (see)
+			// setInterval 比較不會大量堆積，最好還是要適時 delete。查看：js> g.setInterval.registered() (see)
+			g.setInterval = (function(){
+				var registered={};
+				f = function(a,b){
+					var id = setInterval(a,b);
+					registered[id.toString()] = id;
+					return id;
+				};
+				f.clearAll = function(){
+					for(var r in registered){clearInterval( registered[r] )}
+					registered={};
+				};
+				f.registered = function(){return(registered)};
+				return f;    
+			})();
+			g.setTimeout = (function(){
+				var registered={};
+				f = function(a,b){
+					var id = setTimeout(a,b);
+					registered[id.toString()] = id;
+					return id;
+				};
+				f.clearAll = function(){
+					for(var r in registered){clearTimeout( registered[r] )}
+					registered={};
+				};
+				f.registered = function(){return(registered)};
+				return f;    
+			})();
+			// This is a useful common tool. Help to recursively see an object or forth Word.
+			// For forth Words, view the briefing. For other objects, try to see into it.
+			g.see = function (obj,tab){
+				if (tab==undefined) tab = "  "; else tab += "  ";
+				switch(mytypeof(obj)){
+					case "object" :
+					case "array" :
+						if (obj.constructor != Word) {
+							if (obj&&obj.toString) 
+								print(obj.toString() + '\n');
+							else 
+								print(Object.prototype.toString.apply(obj) + '\n');
+							for(var i in obj) {
+								print(tab + i + " : ");  // Entire array already printed here.
+								if (obj[i] && obj[i].toString || obj[i]===0) 
+									print(tab + obj[i].toString() + '\n');
+								else
+									print(tab + Object.prototype.toString.apply(obj[i]) + '\n');
+							}
+							break;  // if is Word then do default
+						}
+					default : // Word(), Constant(), number, string, null, undefined
+						var ss = obj + ''; // Print-able test
+						print(ss + " (" + mytypeof(obj) + ")\n");
+				}
+			}
+			g.debugInner = function (entry, resuming) {
+				var w = phaseA(entry); // 翻譯成恰當的 w.
+				do{
+					while(w) { // 這裡是 forth inner loop 決戰速度之所在，奮力衝鋒！
+						if(bp<0||bp==ip){kvm.jsc.prompt='ip='+ip+" jsc>";eval(kvm.jsc.xt)}; // 可用 bp=ip 設斷點, debug colon words.
+						ip++; // Forth 的通例，inner loop 準備 execute 這個 word 之前，IP 先指到下一個 word.
+						phaseB(w); // 針對不同種類的 w 採取正確方式執行它。
+						w = dictionary[ip];
+					}
+					if(w===0) break; else ip = rstack.pop(); // w==0 is suspend, abort inner but reserve rstack
+					if(resuming) w = dictionary[ip];
+				} while(ip && resuming); // ip==0 means resuming has done
+			}
+			end-code 
+			// ( -- ) Initialize g.members that are moved out from jeforth.js which is thus kept pure.
+			init
+
+code version type("jeforth version. xx.xx T.B.D.\n") end-code
+			// ( -- revision ) print the greeting message and return the revision code
+
+
+			</textarea></div></div><hr>
+    <div><i>Input box -- Ctrl-Enter to execute. Try 'help' command.</i><textarea id="inputbox" cols=100 rows=4></textarea><a id=jump2endofinputbox href="#endofinputbox"></a><div id=endofinputbox></div></div>
+</body>
+</html>
+
